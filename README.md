@@ -1,6 +1,6 @@
 # gozoom
 
-<img align="right" src="https://imgur.com/WqW85j1">
+<img align="right" src="https://i.imgur.com/WqW85j1.jpg">
 
 index:
 1) [what is gozoom?](#about)
