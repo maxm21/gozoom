@@ -1,4 +1,7 @@
 # gozoom
+
+<img align="right" src="https://imgur.com/WqW85j1">
+
 index:
 1) [what is gozoom?](#about)
 2) [goal](#goal)
