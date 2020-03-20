@@ -4,7 +4,6 @@ import (
 	b64 "encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/kataras/iris/core/errors"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -22,33 +21,53 @@ type Bot struct {
 
 type User struct {
 	ToJid,
+	Name,
 	AccountID string
 }
 
-type Message struct {
-	Head struct {
-		Text    string `json:"text,omitempty"`
-		SubHead struct {
-			Text string `json:"text,omitempty"`
-		} `json:"sub_head,omitempty"`
-	} `json:"head,omitempty"`
-	Body []struct {
-		Type     string `json:"type,omitempty"`
-		Sections []struct {
-			Type  string `json:"type,omitempty"`
-			Text  string `json:"text,omitempty"`
-			Items []struct {
-				Key      string `json:"key,omitempty"`
-				Value    string `json:"value,omitempty"`
-				Editable bool   `json:"editable,omitempty"`
-			} `json:"items,omitempty"`
-		} `json:"sections,omitempty"`
-		Footer string `json:"footer,omitempty"`
-	} `json:"body,omitempty"`
+type MessageHead struct {
+	Text    string `json:"text,omitempty"`
+	SubHead *Text  `json:"sub_head,omitempty"`
 }
 
-func authorize(bot *Bot) error {
-	auth := b64.StdEncoding.EncodeToString([]byte(bot.ClientID + ":" + bot.ClientSecret)) // encode the clientid:clientsecret in base64
+type Text struct {
+	Text string `json:"text,omitempty"`
+}
+
+type MessageBody struct {
+	Type              string                `json:"type,omitempty"`
+	SidebarColor      string                `json:"sidebar_color,omitempty"`
+	Sections          []*MessageBodySection `json:"sections,omitempty"`
+	Footer            string                `json:"footer,omitempty"`
+	AttResourceURL string                `json:"resource_url,omitempty"`
+	AttImgURL      string                `json:"img_url,omitempty"`
+	AttInformation *AttData     `json:"information,omitempty"`
+}
+
+type AttData struct {
+	Title       *Text `json:"title,omitempty"`
+	Description *Text `json:"description,omitempty"`
+}
+
+type MessageBodySection struct {
+	Type  string             `json:"type,omitempty"`
+	Text  string             `json:"text,omitempty"`
+	Items []*MessageBodyItem `json:"items,omitempty"`
+}
+
+type MessageBodyItem struct {
+	Key      string `json:"key,omitempty"`
+	Value    string `json:"value,omitempty"`
+	Editable bool   `json:"editable,omitempty"`
+}
+
+type Message struct {
+	Head *MessageHead   `json:"head,omitempty"`
+	Body []*MessageBody `json:"body,omitempty"`
+}
+
+func (b *Bot) authorize() error {
+	auth := b64.StdEncoding.EncodeToString([]byte(b.ClientID + ":" + b.ClientSecret)) // encode the clientid:clientsecret in base64
 
 	client := &http.Client{}
 
@@ -78,7 +97,7 @@ func authorize(bot *Bot) error {
 	}
 	json.Unmarshal(body, &response)
 
-	bot.Bearer = response.AccessToken
+	b.Bearer = response.AccessToken
 	return nil
 }
 
@@ -114,23 +133,32 @@ func (u *User) sendSimpleMsg(m string, bot *Bot) (string, error) {
 	return messageResp.MessageID, nil
 }
 
-func (u *User) sendComplexMsg(m *Message, bot *Bot) (string, error) {
-	/*client := &http.Client{}
+func (u *User) sendComplexMsg(m *Message, b *Bot) (string, error) {
+	client := &http.Client{}
 
-	type MessageSend struct {
-	RobotJid          string `json:"robot_jid"`
-	ToJid             string `json:"to_jid"`
-	AccountID         string `json:"account_id"`
-	IsMarkdownSupport bool   `json:"is_markdown_support"`
-	Message
-}
+	var payload struct {
+		RobotJid          string   `json:"robot_jid"`
+		ToJid             string   `json:"to_jid"`
+		AccountID         string   `json:"account_id"`
+		IsMarkdownSupport bool     `json:"is_markdown_support"`
+		Message           *Message `json:"content"`
+	}
 
-	req, err := http.NewRequest("POST", "https://api.zoom.us/v2/im/chat/messages", strings.NewReader("{\n    \"robot_jid\": \""+bot.BotJID+"\",\n    \"to_jid\": \""+u.ToJid+"\",\n    \"account_id\": \""+u.AccountID+"\",\n    \"content\": {\n        \"head\": {\n            \"text\": \""+m+"\"\n        }\n    }\n}"))
+	payload.RobotJid = b.BotJID
+	payload.ToJid = u.ToJid
+	payload.AccountID = u.AccountID
+	payload.IsMarkdownSupport = true
+	payload.Message = m
+	//working on making this more concise please please excuse the lines above :)
+
+	pload, _ := json.Marshal(payload)
+
+	req, err := http.NewRequest("POST", "https://api.zoom.us/v2/im/chat/messages", strings.NewReader(string(pload)))
 	if err != nil {
 		return "", err
 	}
 
-	req.Header.Add("Authorization", "Bearer " + bot.Bearer)
+	req.Header.Add("Authorization", "Bearer " + b.Bearer)
 
 	res, err := client.Do(req)
 	if err != nil {
@@ -151,8 +179,7 @@ func (u *User) sendComplexMsg(m *Message, bot *Bot) (string, error) {
 	}
 	json.Unmarshal(body, &messageResp)
 
-	return messageResp.MessageID, nil*/
-	return "", nil
+	return messageResp.MessageID, nil
 }
 
 func main() {
@@ -164,30 +191,58 @@ func main() {
 		BotJID:       "XXXX"}
 	user := &User{
 		ToJid:     "XXXX",
+		Name:      "XXXX",
 		AccountID: "XXXX",
 	}
 
-	err := authorize(bot)
-	if err != nil {
-		m := &Message{
-			Head: ,
-			Body: nil,
+	err := bot.authorize()
+	if err == nil {
+		m := &Message{ //this is an example of how to make a complex message (embed, if you will)
+			Head: &MessageHead{
+				Text: "title can be _italic_ ~or not~",
+				SubHead: &Text{
+					"SUBHEADER, <#" + user.ToJid + "|" + user.Name + ">",
+				},
+			},
+			Body: []*MessageBody{
+				&MessageBody{ //First body
+					Type:         "section",
+					SidebarColor: "#F56416",
+					Sections: []*MessageBodySection{
+						&MessageBodySection{
+							Type: "message",
+							Text: "*first message*",
+						},
+						&MessageBodySection{
+							Type: "message",
+							Text: "second message <img:https://images-na.ssl-images-amazon.com/images/I/51Mt-I6%2BEQL._AC_SX466_.jpg>",
+						},
+					},
+					Footer: "FOOTER TEST",
+				},
+				&MessageBody{ //Attachment demo
+					Type:        "attachments",
+					AttResourceURL: "https://golang.org",
+					AttImgURL: "https://images-na.ssl-images-amazon.com/images/I/51Mt-I6%2BEQL._AC_SX466_.jpg",
+					AttInformation: &AttData{
+						Title: &Text{"Gopher"},
+						Description: &Text{"Golang is so cool!"},
+					},
+				},
+			},
 		}
 
-		fmt.Println(m)
-
-		/*
-    mID, err := user.sendSimpleMsg("strring", bot)
+		mID, err := user.sendComplexMsg(m, bot)
+		// mID, err := user.sendSimpleMsg("hi", bot)
 
 		if err != nil {
 			fmt.Println("Error sending message:", err)
 		} else {
 			fmt.Println("Message sent successfully with id", mID)
 		}
-    */
 
 	} else {
-		fmt.Println("Failed to get bearer token. Invalid credentials?\nProgram closing.")
+		fmt.Println(err, "Failed to get bearer token. Invalid credentials?\nProgram closing.")
 		os.Exit(1)
 	}
 }
