@@ -1,11 +1,11 @@
-# gozoom
+<img align="right" src="https://i.imgur.com/WqW85j1.jpg" height=343px length=303px>
 
-<img align="right" src="https://i.imgur.com/WqW85j1.jpg">
+# gozoom
 
 index:
 1) [what is gozoom?](#about)
 2) [goal](#goal)
-3) [how to set up?](#set-up)
+3) [how to set up a zoom bot?](#set-up)
 3) [sources and resources](#sources-and-resources)
 
 # about
